@@ -1,0 +1,168 @@
+---
+title: "Classification of 1994 Census Income Data"
+author: "Titus Njonjo"
+date: "4/20/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Problem Statement: 
+To build a model that will predict if the income of any individual in the US is greater than or less than USD 50,000 based on the data available about that individual.
+Data Set Description:
+This Census Income dataset was collected by Barry Becker in 1994 and given to the public site http://archive.ics.uci.edu/ml/datasets/Census+Income. This data set will help you understand how the income of a person varies depending on various factors such as the education background, occupation, marital status, geography, age, number of working hours/week, etc.
+PREDICTOR VARIABLES
+-Age -Work-class -Final-weight -Education
+-Education-num (Number of years of education)
+-Marital-status -Occupation -Relationship -Race -Sex -Capital-gain -Capital-loss
+-Hours-per-week -Native-country
+RESPONSE VARIABLE
+- Income-level
+
+#Importing data
+```{r}
+trainFile = "adult.data"; testFile = "adult.test"
+if (!file.exists (trainFile))
+  download.file (url = "http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
+destfile = trainFile)
+if(!file.exists(testFile))
+  download.file (url = "http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
+destfile = testFile)
+
+```
+#reading data
+```{r}
+training <- read.table(trainFile,header=FALSE, sep=",", strip.white = TRUE,col.names = colNames, na.strings ="?", stringsAsFactors = TRUE)
+training
+colNames = c ("age", "workclass", "fnlwgt", "education",
+"educationnum", "maritalstatus", "occupation",
+"relationship", "race", "sex", "capitalgain",
+"capitalloss", "hoursperweek", "nativecountry",
+"incomelevel")
+ 
+```
+#display the structure of the data
+```{r}
+str(training)
+```
+#data cleaning,looking for NA values
+```{r}
+table(complete.cases(training))
+summary(training[!complete.cases(training),])
+```
+#Removing missing values
+```{r}
+trainset = training[!is.na(training$workclass) & !is.na(training$occupation),]
+trainset= training[!is.na(training$nativecountry),]
+table(complete.cases(trainset))
+trainset$fnlwgt=NULL
+str(trainset)
+```
+  #data exploration
+```{r}                       
+ summary(trainset$age)
+#boxplot for the age variable
+boxplot(age~incomelevel, data= trainset,
+        main="Imcome level versus the Age",
+        xlab="Income level",
+        ylab="Age",col="salmon")
+#histogram for the income distribution
+Below50K <- (trainset$incomelevel=="<=50k")
+xlimit <- c(min(trainset$age),max(trainset$age))
+ylimit <- c(0,1600)
+hist1 <- qplot(trainset$age,data=trainset[Below50K,], margins=TRUE, binwidth=2, xlim=xlimit, ylim=ylimit, color= trainset$incomelevel)
+hist2 <- qplot(trainset$age,data=trainset[!Below50K,], margins=TRUE, binwidth=2, xlim=xlimit, ylim=ylimit, color=trainset$incomelevel)
+#grid_arrange(hist1,hist2 ,nrow=2)
+#exploring the number of years in education
+summary(trainset$educationnum)
+boxplot(educationnum~incomelevel , data=trainset,
+        main="Number of years in Education ",
+        xlab="Income level",
+        ylab="Education Num",
+        col="salmon")
+#Evaluate hours/week variable
+summary (trainset$hoursperweek)
+boxplot (hoursperweek ~ incomelevel, data = trainset,
+main = "Hours Per Week distribution for different income levels",
+xlab = "Income Levels", ylab = "Hours Per Week", col = "salmon")
+```
+```{r}
+#Exploring work class variable
+qplot(incomelevel, data=trainset,fill=workclass)+ facet_grid(.~workclass)
+#exploring occupation variable
+qplot(incomelevel, data=trainset, fill=occupation)+ facet_grid(.~occupation)
+#exploring marital status
+qplot(incomelevel, data=trainset, fill=maritalstatus)+facet_grid(.~maritalstatus)
+#Exloring the relationship status
+qplot(incomelevel, data=trainset, fill=relationship)+facet_grid(.~relationship)
+#eploring the country native variable
+#qplot(incomelevel, data=trainset, fill=nativecountry)+facet_grid(.~nativecountry)
+```
+#building model
+```{r}
+set.seed(30162)
+trnctrl <- trainControl(method="cv", number=10) 
+boostfit <- train(incomelevel ~ age + educationnum + relationship + workclass +
+                    occupation + relationship + maritalstatus +
+                    hoursperweek + capitalgain + capitalloss +
+                    race + nativecountry,
+                  trcontrol = trnctrl,
+                  method="gbm", 
+                  data=trainset, 
+                  verbose=FALSE)
+options(na.action = =na.warn)
+
+
+
+```
+```{r}
+#Checking the accuracy of the model
+#The output shows that our model calculates the income level of an individual with an accuracy of approximately 86%, which is a good number.
+#So far, we used the training data set to build the model, now its time to validate the model by using the testing data set.###
+
+confusionMatrix (trainSet$incomelevel, predict (boostFit, trainSet))
+
+
+```
+
+```{r}
+#testing the model
+testing <-  read.table (testFile, header = FALSE, sep = ",",
+                        strip.white = TRUE, col.names = colNames,
+                       na.strings = "?", fill = TRUE, stringsAsFactors = TRUE)
+
+#structure  of the test data
+str(testing)
+#checking for missing values
+table(complete.cases(testing))
+summary(testing[!complete.cases(testing),])
+#Removing NAs
+TestSet = testing [!is.na (testing$workclass) & !is.na (testing$occupation), ]
+TestSet = TestSet [!is.na (TestSet$nativecountry), ]
+ 
+#Removing unnecessary variables
+TestSet$fnlwgt = NULL
+```
+```{r}
+#validating model
+#Testing model
+TestSet$predicted = predict (boostFit, TestSet)
+table(TestSet$incomelevel, TestSet$predicted)
+actuals_preds <- data.frame(cbind(actuals=TestSet$incomelevel, predicted=TestSet$predicted))
+# make actuals_predicteds dataframe.
+correlation_accuracy <- cor(actuals_preds)
+head(actuals_preds)
+
+```
+
+
+
+
+
+
