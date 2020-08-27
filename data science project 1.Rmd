@@ -4,7 +4,6 @@ author: "Titus Njonjo"
 date: "4/20/2020"
 output:
   html_document: default
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
